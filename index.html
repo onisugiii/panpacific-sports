@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PanPacific Sports</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page-center">
+    <div style="width:100%; max-width:420px;">
+      <div style="text-align:center; margin-bottom:26px;">
+        <div class="eyebrow">PanPacific Sports</div>
+        <h1 class="display h1">SIGN IN</h1>
+      </div>
+
+      <div class="card form-card" style="max-width:none; margin:0 auto;">
+        <div class="tabs" id="roleTabs">
+          <button class="tab-btn active" data-role="student">Student</button>
+          <button class="tab-btn" data-role="coordinator">Coordinator / Admin</button>
+        </div>
+
+        <!-- STUDENT: login/register sub-tabs -->
+        <div id="studentPanel">
+          <div class="tabs" id="studentModeTabs" style="border-bottom:none; margin-bottom:16px;">
+            <button class="tab-btn active" data-mode="login">Log in</button>
+            <button class="tab-btn" data-mode="register">Register</button>
+          </div>
+
+          <form id="studentLoginForm">
+            <div class="field"><label>Email</label><input type="email" id="sl_email" required></div>
+            <div class="field"><label>Password</label><input type="password" id="sl_password" required></div>
+            <button class="pill-btn solid" style="width:100%; justify-content:center;" type="submit">Log in</button>
+            <button type="button" class="pill-btn" id="studentForgotBtn" style="width:100%; justify-content:center; margin-top:8px;">Forgot password?</button>
+          </form>
+
+          <form id="studentRegisterForm" style="display:none;">
+            <div class="field"><label>Full name</label><input type="text" id="sr_name" required></div>
+            <div class="field"><label>Student ID</label><input type="text" id="sr_studentId" required></div>
+            <div class="field"><label>Team</label>
+              <select id="sr_department" required></select>
+            </div>
+            <div class="field"><label>Email</label><input type="email" id="sr_email" required></div>
+            <div class="field"><label>Password</label><input type="password" id="sr_password" required placeholder="At least 6 characters"></div>
+            <button class="pill-btn solid" style="width:100%; justify-content:center;" type="submit">Create account</button>
+          </form>
+        </div>
+
+        <!-- COORDINATOR / ADMIN: login only -->
+        <div id="coordinatorPanel" style="display:none;">
+          <p class="sub" style="margin-top:-8px;">Coordinator and admin accounts are created by the superadmin.</p>
+          <form id="coordinatorLoginForm">
+            <div class="field"><label>Email</label><input type="email" id="cl_email" required></div>
+            <div class="field"><label>Password</label><input type="password" id="cl_password" required></div>
+            <button class="pill-btn solid" style="width:100%; justify-content:center;" type="submit">Log in</button>
+            <button type="button" class="pill-btn" id="coordinatorForgotBtn" style="width:100%; justify-content:center; margin-top:8px;">Forgot password?</button>
+          </form>
+        </div>
+
+        <div class="error-text" id="errorMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">© 2026 Mark Dave Leaño · Panpacific Sports</footer>
+
+  <div id="modalRoot"></div>
+
+<script src="js/api.js"></script>
+<script>
+  // ---- role tabs (student / coordinator) ----
+  const roleTabs = document.querySelectorAll("#roleTabs .tab-btn");
+  roleTabs.forEach((btn) => btn.addEventListener("click", () => {
+    roleTabs.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const role = btn.dataset.role;
+    document.getElementById("studentPanel").style.display = role === "student" ? "block" : "none";
+    document.getElementById("coordinatorPanel").style.display = role === "coordinator" ? "block" : "none";
+    document.getElementById("errorMsg").textContent = "";
+  }));
+
+  // ---- student login/register sub-tabs ----
+  const modeTabs = document.querySelectorAll("#studentModeTabs .tab-btn");
+  modeTabs.forEach((btn) => btn.addEventListener("click", () => {
+    modeTabs.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    const mode = btn.dataset.mode;
+    document.getElementById("studentLoginForm").style.display = mode === "login" ? "block" : "none";
+    document.getElementById("studentRegisterForm").style.display = mode === "register" ? "block" : "none";
+    document.getElementById("errorMsg").textContent = "";
+  }));
+
+  function showError(msg) { document.getElementById("errorMsg").textContent = msg; }
+
+  // ---- load departments for the register form ----
+  (async () => {
+    try {
+      const { departments } = await api("/departments", { auth: false });
+      const sel = document.getElementById("sr_department");
+      sel.innerHTML = departments.map((d) => `<option value="${d.id}">${d.name}</option>`).join("");
+    } catch (e) {
+      showError("Couldn't load departments. Is the server running?");
+    }
+  })();
+
+  // ---- student login ----
+  document.getElementById("studentLoginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showError("");
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const data = await api("/auth/login", {
+        method: "POST", auth: false,
+        body: { email: document.getElementById("sl_email").value, password: document.getElementById("sl_password").value },
+      });
+      if (data.user.role !== "student") { btn.disabled = false; return showError("That account isn't a student account."); }
+      setSession(data.token, data.user);
+      window.location.href = "student.html";
+    } catch (err) { btn.disabled = false; showError(err.message); }
+  });
+
+  // ---- student register ----
+  document.getElementById("studentRegisterForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showError("");
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const data = await api("/auth/register", {
+        method: "POST", auth: false,
+        body: {
+          name: document.getElementById("sr_name").value,
+          studentId: document.getElementById("sr_studentId").value,
+          departmentId: document.getElementById("sr_department").value,
+          email: document.getElementById("sr_email").value,
+          password: document.getElementById("sr_password").value,
+        },
+      });
+      setSession(data.token, data.user);
+      window.location.href = "student.html";
+    } catch (err) { btn.disabled = false; showError(err.message); }
+  });
+
+  // ---- coordinator login ----
+  document.getElementById("coordinatorLoginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showError("");
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const data = await api("/auth/login", {
+        method: "POST", auth: false,
+        body: { email: document.getElementById("cl_email").value, password: document.getElementById("cl_password").value },
+      });
+      if (!["coordinator", "admin"].includes(data.user.role)) { btn.disabled = false; return showError("That account isn't a coordinator or admin account."); }
+      setSession(data.token, data.user);
+      window.location.href = "coordinator.html";
+    } catch (err) { btn.disabled = false; showError(err.message); }
+  });
+
+  // ---- forgot password (students & admins; coordinator resets manually) ----
+  function openForgotPasswordModal() {
+    const modalRoot = document.getElementById("modalRoot");
+    modalRoot.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-box">
+          <div class="modal-head"><h3>Forgot password</h3><button class="icon-btn" id="closeModal">✕</button></div>
+          <p class="sub" style="margin-top:-8px;">Enter your email. The coordinator will review your request and reset your password.</p>
+          <div class="field"><label>Email</label><input type="email" id="fp_email"></div>
+          <div class="error-text" id="fp_error"></div>
+          <div class="success-text" id="fp_success" style="display:none;"></div>
+          <button class="pill-btn solid" style="width:100%; justify-content:center;" id="fp_submit">Send request</button>
+        </div>
+      </div>`;
+    document.getElementById("closeModal").addEventListener("click", () => { modalRoot.innerHTML = ""; });
+    document.getElementById("fp_submit").addEventListener("click", async () => {
+      const btn = document.getElementById("fp_submit");
+      if (btn.disabled) return; // guard against a second click while the first request is in flight
+      const email = document.getElementById("fp_email").value.trim();
+      document.getElementById("fp_error").textContent = "";
+      if (!email) return;
+      btn.disabled = true;
+      try {
+        const data = await api("/auth/forgot-password", { method: "POST", auth: false, body: { email } });
+        document.getElementById("fp_success").style.display = "block";
+        document.getElementById("fp_success").textContent = data.message || "Request sent.";
+        document.getElementById("fp_submit").style.display = "none";
+      } catch (err) {
+        document.getElementById("fp_error").textContent = err.message;
+        btn.disabled = false;
+      }
+    });
+  }
+  document.getElementById("studentForgotBtn").addEventListener("click", openForgotPasswordModal);
+  document.getElementById("coordinatorForgotBtn").addEventListener("click", openForgotPasswordModal);
+
+  // If already logged in, skip straight to the right dashboard.
+  (function redirectIfLoggedIn() {
+    const user = getUser();
+    if (user && getToken()) {
+      window.location.href = ["coordinator", "admin"].includes(user.role) ? "coordinator.html" : "student.html";
+    }
+  })();
+</script>
+</body>
+</html>

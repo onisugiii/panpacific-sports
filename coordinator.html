@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PanPacific Sports — Coordinator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow" id="roleLabel">PanPacific Sports</div>
+        <h1 class="display h1" id="dashTitle">COORDINATOR</h1>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="pill-btn" id="myAccountBtn">My account</button>
+        <button class="pill-btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <div class="section-label">🏆 Overall Championship Points</div>
+    <div id="overallPoints" style="margin-bottom:28px;"></div>
+
+    <div class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-tab="live">Live & Schedule</button>
+      <button class="tab-btn" data-tab="registrations">Registrations</button>
+      <button class="tab-btn" data-tab="rosters">Rosters & Lineups</button>
+      <button class="tab-btn" data-tab="standings">Standings</button>
+      <button class="tab-btn" data-tab="setup">Teams & Sports</button>
+      <button class="tab-btn" data-tab="users" id="usersTabBtn" style="display:none;">Users</button>
+    </div>
+
+    <div id="tab-live"></div>
+    <div id="tab-registrations" style="display:none;"></div>
+    <div id="tab-rosters" style="display:none;"></div>
+    <div id="tab-standings" style="display:none;"></div>
+    <div id="tab-setup" style="display:none;"></div>
+    <div id="tab-users" style="display:none;"></div>
+  </div>
+
+  <footer class="site-footer">© 2026 Mark Dave Leaño · Panpacific Sports</footer>
+
+  <div id="modalRoot"></div>
+  <div id="scoreboardRoot"></div>
+
+<script src="js/api.js"></script>
+<script src="js/coordinator.js"></script>
+</body>
+</html>
