@@ -369,7 +369,8 @@ a { color: inherit; }
 .scoreboard-team .score { font-size: 140px; line-height: 1; margin-top: 8px; display: flex; justify-content: center; }
 .scoreboard-vs { font-family: 'Teko', sans-serif; font-size: 40px; color: var(--muted); }
 .scoreboard-status { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-align: center; }
-.scoreboard-controls { display: flex; gap: 6px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.scoreboard-controls { display: flex; gap: 10px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.scoreboard-controls .minus { margin-right: 8px; }
 .scoreboard-ctrl-btn {
   border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 14px; font-weight: 700;
   cursor: pointer; font-family: inherit; background: var(--panel2); color: var(--text);
@@ -392,7 +393,9 @@ a { color: inherit; }
 
 .live-tag { color: var(--red); font-size: 10px; font-weight: 700; letter-spacing: 0.03em; }
 .scoreboard-periods { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
-.scoreboard-period { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; text-align: center; min-width: 90px; }
+.scoreboard-period { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; text-align: center; min-width: 90px; cursor: pointer; transition: border-color 0.12s ease; }
+.scoreboard-period:hover { border-color: var(--muted); }
+.scoreboard-editing-hint { text-align: center; color: var(--muted); font-size: 11px; margin-top: 8px; }
 .scoreboard-period.active { border-color: var(--gold); }
 .scoreboard-period .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 .scoreboard-period .vals { font-size: 18px; }

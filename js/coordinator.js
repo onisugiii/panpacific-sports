@@ -431,21 +431,15 @@ function renderScoreboardContent(matchId) {
   const currentPeriod = m.currentPeriod || 0;
   scoreboardActivePeriod = Math.min(Math.max(0, scoreboardActivePeriod), Math.max(0, periods.length - 1));
 
-  const periodNavHtml = periods.length > 1 ? `
-    <div class="scoreboard-period-nav">
-      <button class="icon-btn" id="sbPeriodPrev" ${scoreboardActivePeriod === 0 ? "disabled" : ""}>‹</button>
-      <span>Editing: ${periodLabel} ${scoreboardActivePeriod + 1}</span>
-      <button class="icon-btn" id="sbPeriodNext" ${scoreboardActivePeriod === periods.length - 1 ? "disabled" : ""}>›</button>
-    </div>` : "";
-
   const periodsHtml = periods.length > 1 ? `
     <div class="scoreboard-periods">
       ${periods.map((p, i) => `
-        <div class="scoreboard-period ${i === scoreboardActivePeriod ? "active" : ""}">
+        <div class="scoreboard-period ${i === scoreboardActivePeriod ? "active" : ""}" data-sb-select-period="${i}">
           <div class="lbl">${periodLabel} ${i + 1}${i === currentPeriod ? ` <span class="live-tag">${isLive ? "● LIVE" : "● CURRENT"}</span>` : ""}</div>
           <div class="vals"><span style="color:${a.color};">${p.a || 0}</span> – <span style="color:${b.color};">${p.b || 0}</span></div>
         </div>`).join("")}
-    </div>` : "";
+    </div>
+    <div class="scoreboard-editing-hint">Tap a ${periodLabel.toLowerCase()} above to score it</div>` : "";
 
   // Game clock + live-quarter advance -- separate from the period-editing nav
   // above, which is for correcting a past period's score. This is for
@@ -487,7 +481,6 @@ function renderScoreboardContent(matchId) {
     <div class="scoreboard-sport">${sportIconHtml(sport.emoji)} ${sport.name}${m.venue ? " · " + m.venue : ""}</div>
     <div class="scoreboard-status">${statusHtml}</div>
     ${clockHtml}
-    ${periodNavHtml}
     <div class="scoreboard-teams">
       <div class="scoreboard-team">
         <div class="name">${a.name}</div>
@@ -505,10 +498,10 @@ function renderScoreboardContent(matchId) {
     ${!isFinal ? `<div class="scoreboard-finalize"><button class="pill-btn danger" id="sbFinalizeBtn">🏁 Finalize Match</button></div>` : ""}
   `;
 
-  const prevBtn = document.getElementById("sbPeriodPrev");
-  const nextBtn = document.getElementById("sbPeriodNext");
-  if (prevBtn) prevBtn.addEventListener("click", () => { scoreboardActivePeriod--; renderScoreboardContent(matchId); });
-  if (nextBtn) nextBtn.addEventListener("click", () => { scoreboardActivePeriod++; renderScoreboardContent(matchId); });
+  content.querySelectorAll("[data-sb-select-period]").forEach((box) => box.addEventListener("click", () => {
+    scoreboardActivePeriod = Number(box.dataset.sbSelectPeriod);
+    renderScoreboardContent(matchId);
+  }));
 
   const livePrevBtn = document.getElementById("sbLivePeriodPrev");
   const liveNextBtn = document.getElementById("sbLivePeriodNext");
