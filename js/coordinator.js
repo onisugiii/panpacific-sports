@@ -487,6 +487,7 @@ function renderScoreboardContent(matchId) {
     <div class="scoreboard-sport">${sportIconHtml(sport.emoji)} ${sport.name}${m.venue ? " · " + m.venue : ""}</div>
     <div class="scoreboard-status">${statusHtml}</div>
     ${clockHtml}
+    ${periodNavHtml}
     <div class="scoreboard-teams">
       <div class="scoreboard-team">
         <div class="name">${a.name}</div>
@@ -500,7 +501,6 @@ function renderScoreboardContent(matchId) {
         ${scoreControls("B")}
       </div>
     </div>
-    ${periodNavHtml}
     ${periodsHtml}
     ${!isFinal ? `<div class="scoreboard-finalize"><button class="pill-btn danger" id="sbFinalizeBtn">🏁 Finalize Match</button></div>` : ""}
   `;
