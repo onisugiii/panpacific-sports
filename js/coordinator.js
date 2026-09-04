@@ -438,8 +438,7 @@ function renderScoreboardContent(matchId) {
           <div class="lbl">${periodLabel} ${i + 1}${i === currentPeriod ? ` <span class="live-tag">${isLive ? "● LIVE" : "● CURRENT"}</span>` : ""}</div>
           <div class="vals"><span style="color:${a.color};">${p.a || 0}</span> – <span style="color:${b.color};">${p.b || 0}</span></div>
         </div>`).join("")}
-    </div>
-    <div class="scoreboard-editing-hint">Tap a ${periodLabel.toLowerCase()} above to score it</div>` : "";
+    </div>` : "";
 
   // Game clock + live-quarter advance -- separate from the period-editing nav
   // above, which is for correcting a past period's score. This is for
