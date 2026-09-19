@@ -564,8 +564,13 @@ function renderScoreboardContent(matchId) {
   }));
 }
 
+// Exiting fullscreen (Esc key, OS window snap, or -- notably -- opening
+// DevTools, which forces browsers out of fullscreen to make room for the
+// panel) should NOT tear down a live scoreboard and its running clock.
+// Only the explicit "Exit" button and Finalize should ever call closeScoreboard().
 document.addEventListener("fullscreenchange", () => {
-  if (!document.fullscreenElement && scoreboardRoot.innerHTML) closeScoreboard();
+  // Intentionally left as a no-op. Fullscreen is a presentation nicety here,
+  // not something the scoreboard's lifecycle depends on.
 });
 
 // ================= REGISTRATIONS =================
