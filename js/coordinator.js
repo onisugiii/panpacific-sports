@@ -248,7 +248,8 @@ function matchCardHtml(m, sport, a, b) {
 // ================= FULLSCREEN SCOREBOARD =================
 const scoreboardRoot = document.getElementById("scoreboardRoot");
 let scoreboardActivePeriod = 0;
-let scoreboardClockInterval = null;
+let scoreboardOpenMatchId = null;   // which match the fullscreen scoreboard is currently showing
+let scoreboardClockRaf = null;      // requestAnimationFrame handle -- replaces the old setInterval
 let scoreboardAutoPausing = false; // guards against firing the auto-pause-at-0:00 call more than once
 
 function formatClock(totalSeconds) {
@@ -282,6 +283,43 @@ function displayClockSeconds(m, sport) {
   return duration == null ? elapsed : Math.max(0, duration - elapsed);
 }
 
+// Repaints ONLY the clock's own element, every animation frame. Using
+// requestAnimationFrame + a fresh Date.now() diff (instead of the old
+// setInterval) means the number on screen can never silently fall behind --
+// if a frame gets skipped or throttled (backgrounded tab, fullscreen
+// transitions, etc.), the very next one just recomputes from scratch and
+// jumps straight to the correct value instead of staying frozen.
+function tickScoreboardClock() {
+  const matchId = scoreboardOpenMatchId;
+  const clockEl = matchId ? document.getElementById("scoreboardClockTime") : null;
+  if (!matchId || !clockEl) { scoreboardClockRaf = null; return; } // overlay isn't open anymore
+
+  const current = matches.find((x) => x.id === matchId);
+  if (!current) { scoreboardClockRaf = null; return; }
+  const sport = sportById()[current.sportId];
+  const duration = periodDurationSeconds(sport);
+
+  // Countdown sport hit 0:00 while running -- auto-pause it server-side so
+  // the frozen time is correct, then re-render to show "Time's Up" state.
+  if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
+    scoreboardAutoPausing = true;
+    adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
+  } else {
+    clockEl.textContent = formatClock(displayClockSeconds(current, sport));
+  }
+
+  scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
+}
+
+// If the browser throttled/paused the animation frame loop (backgrounded
+// tab, minimized window) and it's left "running," snap straight to the
+// correct value the moment the page is visible again.
+function forceScoreboardClockRepaint() {
+  if (document.visibilityState !== "visible") return;
+  if (!scoreboardOpenMatchId) return;
+  if (!scoreboardClockRaf) scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
+}
+
 // The .scoreboard-overlay element is the actual fullscreen element -- once
 // requestFullscreen() is called on it, that exact DOM node must stay alive
 // or the browser auto-exits fullscreen. So it's built ONCE here; every
@@ -290,6 +328,7 @@ function displayClockSeconds(m, sport) {
 function openScoreboard(matchId) {
   const m = matches.find((x) => x.id === matchId);
   scoreboardActivePeriod = m ? (m.currentPeriod || 0) : 0; // default to the live quarter/set/half
+  scoreboardOpenMatchId = matchId;
   scoreboardAutoPausing = false;
 
   scoreboardRoot.innerHTML = `
@@ -301,24 +340,10 @@ function openScoreboard(matchId) {
 
   renderScoreboardContent(matchId);
 
-  if (scoreboardClockInterval) clearInterval(scoreboardClockInterval);
-  scoreboardClockInterval = setInterval(() => {
-    const current = matches.find((x) => x.id === matchId);
-    if (!current) return;
-    const sport = sportById()[current.sportId];
-    const duration = periodDurationSeconds(sport);
-
-    // Countdown sport hit 0:00 while running -- auto-pause it server-side so
-    // the frozen time is correct, then re-render to show "Time's Up" state.
-    if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
-      scoreboardAutoPausing = true;
-      adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
-      return;
-    }
-
-    const clockEl = document.getElementById("scoreboardClockTime");
-    if (clockEl) clockEl.textContent = formatClock(displayClockSeconds(current, sport));
-  }, 1000);
+  if (scoreboardClockRaf) cancelAnimationFrame(scoreboardClockRaf);
+  scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
+  document.addEventListener("visibilitychange", forceScoreboardClockRepaint);
+  window.addEventListener("focus", forceScoreboardClockRepaint);
 
   const el = scoreboardRoot.querySelector(".scoreboard-overlay");
   if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {});
@@ -327,7 +352,10 @@ function openScoreboard(matchId) {
 function closeScoreboard() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   scoreboardRoot.innerHTML = "";
-  if (scoreboardClockInterval) { clearInterval(scoreboardClockInterval); scoreboardClockInterval = null; }
+  if (scoreboardClockRaf) { cancelAnimationFrame(scoreboardClockRaf); scoreboardClockRaf = null; }
+  scoreboardOpenMatchId = null;
+  document.removeEventListener("visibilitychange", forceScoreboardClockRepaint);
+  window.removeEventListener("focus", forceScoreboardClockRepaint);
 }
 
 async function adjustScoreboardScore(matchId, side, delta) {
@@ -521,7 +549,7 @@ function renderScoreboardContent(matchId) {
 }
 
 document.addEventListener("fullscreenchange", () => {
-  if (!document.fullscreenElement && scoreboardRoot.innerHTML) scoreboardRoot.innerHTML = "";
+  if (!document.fullscreenElement && scoreboardRoot.innerHTML) closeScoreboard();
 });
 
 // ================= REGISTRATIONS =================
