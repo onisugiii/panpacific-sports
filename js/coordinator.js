@@ -544,7 +544,7 @@ function renderRegistrationsTab() {
     : `<div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th style="width:34%;">Student</th><th style="width:18%;">Sport</th><th style="width:18%;">Team</th><th style="width:14%;">Status</th><th style="width:16%;"></th></tr>
+            <tr><th style="width:30%;">Student</th><th style="width:16%;">Sport</th><th style="width:16%;">Team</th><th style="width:12%;">Status</th><th style="width:13%;">Approve</th><th style="width:13%;">Reject</th></tr>
           </thead>
           <tbody>
             ${visible.map((r) => `
@@ -556,10 +556,8 @@ function renderRegistrationsTab() {
                 <td>${r.sportName}</td>
                 <td>${r.departmentName}</td>
                 <td><span class="status-badge ${r.status}">${r.status}</span></td>
-                <td class="actions">
-                  ${r.status !== "approved" ? `<button class="pill-btn solid" data-reg-action="${r.id}|approved">Approve</button>` : ""}
-                  ${r.status !== "rejected" ? `<button class="pill-btn danger" data-reg-action="${r.id}|rejected">Reject</button>` : ""}
-                </td>
+                <td class="actions">${r.status !== "approved" ? `<button class="pill-btn solid" data-reg-action="${r.id}|approved">Approve</button>` : ""}</td>
+                <td class="actions">${r.status !== "rejected" ? `<button class="pill-btn danger" data-reg-action="${r.id}|rejected">Reject</button>` : ""}</td>
               </tr>`).join("")}
           </tbody>
         </table>

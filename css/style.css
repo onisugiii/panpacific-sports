@@ -289,7 +289,7 @@ a { color: inherit; }
 .data-table tbody tr:hover { background: var(--panel2); }
 .data-table .name { font-size: 14px; font-weight: 600; }
 .data-table .meta { color: var(--muted); font-size: 12px; }
-.data-table td.actions { display: flex; gap: 8px; justify-content: flex-end; white-space: nowrap; }
+.data-table td.actions { display: flex; gap: 8px; justify-content: center; white-space: nowrap; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .grid-2 select {
