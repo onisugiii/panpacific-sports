@@ -297,10 +297,18 @@ function tickScoreboardClock() {
   // in the DOM anymore. A match temporarily missing from `matches` (e.g. a
   // brief moment mid-reload elsewhere in the app) must NOT kill the loop --
   // just skip this one frame and try again next frame.
-  if (!matchId) { scoreboardClockRaf = null; return; }
+  if (!matchId) {
+    console.warn("[scoreboard clock] stopped: scoreboardOpenMatchId is empty");
+    scoreboardClockRaf = null;
+    return;
+  }
 
   const clockEl = document.getElementById("scoreboardClockTime");
-  if (!clockEl) { scoreboardClockRaf = null; return; } // overlay isn't open anymore
+  if (!clockEl) {
+    console.warn("[scoreboard clock] stopped: #scoreboardClockTime not found in DOM for match", matchId);
+    scoreboardClockRaf = null;
+    return;
+  }
 
   const current = matches.find((x) => x.id === matchId);
   if (current) {
@@ -336,6 +344,17 @@ function forceScoreboardClockRepaint() {
 // subsequent update (score buttons, period nav) only touches the inner
 // #scoreboardContent div, never the outer wrapper.
 function openScoreboard(matchId) {
+  // Hardening: if a previous scoreboard session wasn't torn down cleanly
+  // (e.g. its listeners/raf survived some edge case we haven't tracked down
+  // yet), guarantee a completely clean slate before opening a new one,
+  // instead of layering new state on top of a leftover session.
+  if (scoreboardOpenMatchId || scoreboardClockRaf) {
+    console.warn("[scoreboard clock] found a leftover session before opening a new one -- cleaning it up first", {
+      previousMatchId: scoreboardOpenMatchId, hadRaf: !!scoreboardClockRaf,
+    });
+    closeScoreboard();
+  }
+
   const m = matches.find((x) => x.id === matchId);
   scoreboardActivePeriod = m ? (m.currentPeriod || 0) : 0; // default to the live quarter/set/half
   scoreboardOpenMatchId = matchId;
@@ -457,12 +476,18 @@ function renderScoreboardContent(matchId) {
   if (!content) return; // overlay isn't open (e.g. got closed mid-request)
 
   const m = matches.find((x) => x.id === matchId);
-  if (!m) return closeScoreboard();
+  if (!m) {
+    console.warn("[scoreboard] closing: match not found in `matches` array", matchId);
+    return closeScoreboard();
+  }
   const sport = sportById()[m.sportId];
   const dmap = deptById();
   const a = dmap[m.departmentA];
   const b = dmap[m.departmentB];
-  if (!sport || !a || !b) return closeScoreboard();
+  if (!sport || !a || !b) {
+    console.warn("[scoreboard] closing: sport/team lookup failed", { sport: !!sport, a: !!a, b: !!b, matchId });
+    return closeScoreboard();
+  }
 
   const isLive = m.status === "live";
   const isFinal = m.status === "final";
