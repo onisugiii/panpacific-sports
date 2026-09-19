@@ -291,22 +291,32 @@ function displayClockSeconds(m, sport) {
 // jumps straight to the correct value instead of staying frozen.
 function tickScoreboardClock() {
   const matchId = scoreboardOpenMatchId;
-  const clockEl = matchId ? document.getElementById("scoreboardClockTime") : null;
-  if (!matchId || !clockEl) { scoreboardClockRaf = null; return; } // overlay isn't open anymore
+
+  // Only two things should ever permanently stop this loop: the scoreboard
+  // was actually closed (no matchId), or its clock element genuinely isn't
+  // in the DOM anymore. A match temporarily missing from `matches` (e.g. a
+  // brief moment mid-reload elsewhere in the app) must NOT kill the loop --
+  // just skip this one frame and try again next frame.
+  if (!matchId) { scoreboardClockRaf = null; return; }
+
+  const clockEl = document.getElementById("scoreboardClockTime");
+  if (!clockEl) { scoreboardClockRaf = null; return; } // overlay isn't open anymore
 
   const current = matches.find((x) => x.id === matchId);
-  if (!current) { scoreboardClockRaf = null; return; }
-  const sport = sportById()[current.sportId];
-  const duration = periodDurationSeconds(sport);
+  if (current) {
+    const sport = sportById()[current.sportId];
+    const duration = periodDurationSeconds(sport);
 
-  // Countdown sport hit 0:00 while running -- auto-pause it server-side so
-  // the frozen time is correct, then re-render to show "Time's Up" state.
-  if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
-    scoreboardAutoPausing = true;
-    adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
-  } else {
-    clockEl.textContent = formatClock(displayClockSeconds(current, sport));
+    // Countdown sport hit 0:00 while running -- auto-pause it server-side so
+    // the frozen time is correct, then re-render to show "Time's Up" state.
+    if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
+      scoreboardAutoPausing = true;
+      adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
+    } else {
+      clockEl.textContent = formatClock(displayClockSeconds(current, sport));
+    }
   }
+  // else: match not found this frame -- just skip painting and try again below.
 
   scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
 }
@@ -386,6 +396,12 @@ async function adjustScoreboardClock(matchId, action) {
     matches[idx] = updated;
     renderScoreboardContent(matchId);
     renderLiveTab();
+    // Belt-and-suspenders: if the tick loop somehow isn't running (e.g. it
+    // died before this self-healing fix was in place), Start/Pause always
+    // revives it instead of requiring the scoreboard to be closed and reopened.
+    if (!scoreboardClockRaf && scoreboardOpenMatchId === matchId) {
+      scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
+    }
   } catch (e) {
     alert(e.message);
     btns.forEach((b) => (b.disabled = false));
