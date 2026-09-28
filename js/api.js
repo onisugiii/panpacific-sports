@@ -4,6 +4,13 @@
 
 const API_BASE = "/api";
 
+// How far this device's clock is from the server's clock (server minus local,
+// in ms). The game clock stores its start time using SERVER time, so anything
+// that compares it to "now" must use serverNow() instead of Date.now() --
+// otherwise a device whose clock is a few minutes off shows a frozen or wrong clock.
+let serverOffsetMs = 0;
+function serverNow() { return Date.now() + serverOffsetMs; }
+
 function getToken() {
   return localStorage.getItem("im_token");
 }
@@ -35,6 +42,11 @@ async function api(path, { method = "GET", body, auth = true } = {}) {
     });
   } catch (e) {
     throw new Error("Couldn't reach the server. Is it running?");
+  }
+  const serverDate = res.headers.get("Date");
+  if (serverDate) {
+    const t = Date.parse(serverDate);
+    if (!Number.isNaN(t)) serverOffsetMs = t - Date.now();
   }
   let data = {};
   try { data = await res.json(); } catch { /* no body */ }

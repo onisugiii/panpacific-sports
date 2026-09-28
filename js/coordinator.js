@@ -248,8 +248,7 @@ function matchCardHtml(m, sport, a, b) {
 // ================= FULLSCREEN SCOREBOARD =================
 const scoreboardRoot = document.getElementById("scoreboardRoot");
 let scoreboardActivePeriod = 0;
-let scoreboardOpenMatchId = null;   // which match the fullscreen scoreboard is currently showing
-let scoreboardClockRaf = null;      // requestAnimationFrame handle -- replaces the old setInterval
+let scoreboardClockInterval = null;
 let scoreboardAutoPausing = false; // guards against firing the auto-pause-at-0:00 call more than once
 
 function formatClock(totalSeconds) {
@@ -264,7 +263,7 @@ function formatClock(totalSeconds) {
 function liveClockSeconds(m) {
   if (!m.clockRunning || !m.clockStartedAt) return m.clockSeconds || 0;
   const startedAt = new Date(m.clockStartedAt).getTime();
-  return (m.clockSeconds || 0) + Math.max(0, (Date.now() - startedAt) / 1000);
+  return (m.clockSeconds || 0) + Math.max(0, (serverNow() - startedAt) / 1000);
 }
 
 // null = no time limit for this sport (plain count-up stopwatch, unchanged
@@ -283,81 +282,14 @@ function displayClockSeconds(m, sport) {
   return duration == null ? elapsed : Math.max(0, duration - elapsed);
 }
 
-// Repaints ONLY the clock's own element, every animation frame. Using
-// requestAnimationFrame + a fresh Date.now() diff (instead of the old
-// setInterval) means the number on screen can never silently fall behind --
-// if a frame gets skipped or throttled (backgrounded tab, fullscreen
-// transitions, etc.), the very next one just recomputes from scratch and
-// jumps straight to the correct value instead of staying frozen.
-function tickScoreboardClock() {
-  const matchId = scoreboardOpenMatchId;
-
-  // Only two things should ever permanently stop this loop: the scoreboard
-  // was actually closed (no matchId), or its clock element genuinely isn't
-  // in the DOM anymore. A match temporarily missing from `matches` (e.g. a
-  // brief moment mid-reload elsewhere in the app) must NOT kill the loop --
-  // just skip this one frame and try again next frame.
-  if (!matchId) {
-    console.warn("[scoreboard clock] stopped: scoreboardOpenMatchId is empty");
-    scoreboardClockRaf = null;
-    return;
-  }
-
-  const clockEl = document.getElementById("scoreboardClockTime");
-  if (!clockEl) {
-    console.warn("[scoreboard clock] stopped: #scoreboardClockTime not found in DOM for match", matchId);
-    scoreboardClockRaf = null;
-    return;
-  }
-
-  const current = matches.find((x) => x.id === matchId);
-  if (current) {
-    const sport = sportById()[current.sportId];
-    const duration = periodDurationSeconds(sport);
-
-    // Countdown sport hit 0:00 while running -- auto-pause it server-side so
-    // the frozen time is correct, then re-render to show "Time's Up" state.
-    if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
-      scoreboardAutoPausing = true;
-      adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
-    } else {
-      clockEl.textContent = formatClock(displayClockSeconds(current, sport));
-    }
-  }
-  // else: match not found this frame -- just skip painting and try again below.
-
-  scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
-}
-
-// If the browser throttled/paused the animation frame loop (backgrounded
-// tab, minimized window) and it's left "running," snap straight to the
-// correct value the moment the page is visible again.
-function forceScoreboardClockRepaint() {
-  if (document.visibilityState !== "visible") return;
-  if (!scoreboardOpenMatchId) return;
-  if (!scoreboardClockRaf) scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
-}
-
 // The .scoreboard-overlay element is the actual fullscreen element -- once
 // requestFullscreen() is called on it, that exact DOM node must stay alive
 // or the browser auto-exits fullscreen. So it's built ONCE here; every
 // subsequent update (score buttons, period nav) only touches the inner
 // #scoreboardContent div, never the outer wrapper.
 function openScoreboard(matchId) {
-  // Hardening: if a previous scoreboard session wasn't torn down cleanly
-  // (e.g. its listeners/raf survived some edge case we haven't tracked down
-  // yet), guarantee a completely clean slate before opening a new one,
-  // instead of layering new state on top of a leftover session.
-  if (scoreboardOpenMatchId || scoreboardClockRaf) {
-    console.warn("[scoreboard clock] found a leftover session before opening a new one -- cleaning it up first", {
-      previousMatchId: scoreboardOpenMatchId, hadRaf: !!scoreboardClockRaf,
-    });
-    closeScoreboard();
-  }
-
   const m = matches.find((x) => x.id === matchId);
   scoreboardActivePeriod = m ? (m.currentPeriod || 0) : 0; // default to the live quarter/set/half
-  scoreboardOpenMatchId = matchId;
   scoreboardAutoPausing = false;
 
   scoreboardRoot.innerHTML = `
@@ -369,10 +301,24 @@ function openScoreboard(matchId) {
 
   renderScoreboardContent(matchId);
 
-  if (scoreboardClockRaf) cancelAnimationFrame(scoreboardClockRaf);
-  scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
-  document.addEventListener("visibilitychange", forceScoreboardClockRepaint);
-  window.addEventListener("focus", forceScoreboardClockRepaint);
+  if (scoreboardClockInterval) clearInterval(scoreboardClockInterval);
+  scoreboardClockInterval = setInterval(() => {
+    const current = matches.find((x) => x.id === matchId);
+    if (!current) return;
+    const sport = sportById()[current.sportId];
+    const duration = periodDurationSeconds(sport);
+
+    // Countdown sport hit 0:00 while running -- auto-pause it server-side so
+    // the frozen time is correct, then re-render to show "Time's Up" state.
+    if (duration != null && current.clockRunning && liveClockSeconds(current) >= duration && !scoreboardAutoPausing) {
+      scoreboardAutoPausing = true;
+      adjustScoreboardClock(matchId, "pause").finally(() => { scoreboardAutoPausing = false; });
+      return;
+    }
+
+    const clockEl = document.getElementById("scoreboardClockTime");
+    if (clockEl) clockEl.textContent = formatClock(displayClockSeconds(current, sport));
+  }, 1000);
 
   const el = scoreboardRoot.querySelector(".scoreboard-overlay");
   if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {});
@@ -381,10 +327,7 @@ function openScoreboard(matchId) {
 function closeScoreboard() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   scoreboardRoot.innerHTML = "";
-  if (scoreboardClockRaf) { cancelAnimationFrame(scoreboardClockRaf); scoreboardClockRaf = null; }
-  scoreboardOpenMatchId = null;
-  document.removeEventListener("visibilitychange", forceScoreboardClockRepaint);
-  window.removeEventListener("focus", forceScoreboardClockRepaint);
+  if (scoreboardClockInterval) { clearInterval(scoreboardClockInterval); scoreboardClockInterval = null; }
 }
 
 async function adjustScoreboardScore(matchId, side, delta) {
@@ -415,12 +358,6 @@ async function adjustScoreboardClock(matchId, action) {
     matches[idx] = updated;
     renderScoreboardContent(matchId);
     renderLiveTab();
-    // Belt-and-suspenders: if the tick loop somehow isn't running (e.g. it
-    // died before this self-healing fix was in place), Start/Pause always
-    // revives it instead of requiring the scoreboard to be closed and reopened.
-    if (!scoreboardClockRaf && scoreboardOpenMatchId === matchId) {
-      scoreboardClockRaf = requestAnimationFrame(tickScoreboardClock);
-    }
   } catch (e) {
     alert(e.message);
     btns.forEach((b) => (b.disabled = false));
@@ -476,18 +413,12 @@ function renderScoreboardContent(matchId) {
   if (!content) return; // overlay isn't open (e.g. got closed mid-request)
 
   const m = matches.find((x) => x.id === matchId);
-  if (!m) {
-    console.warn("[scoreboard] closing: match not found in `matches` array", matchId);
-    return closeScoreboard();
-  }
+  if (!m) return closeScoreboard();
   const sport = sportById()[m.sportId];
   const dmap = deptById();
   const a = dmap[m.departmentA];
   const b = dmap[m.departmentB];
-  if (!sport || !a || !b) {
-    console.warn("[scoreboard] closing: sport/team lookup failed", { sport: !!sport, a: !!a, b: !!b, matchId });
-    return closeScoreboard();
-  }
+  if (!sport || !a || !b) return closeScoreboard();
 
   const isLive = m.status === "live";
   const isFinal = m.status === "final";
@@ -589,13 +520,8 @@ function renderScoreboardContent(matchId) {
   }));
 }
 
-// Exiting fullscreen (Esc key, OS window snap, or -- notably -- opening
-// DevTools, which forces browsers out of fullscreen to make room for the
-// panel) should NOT tear down a live scoreboard and its running clock.
-// Only the explicit "Exit" button and Finalize should ever call closeScoreboard().
 document.addEventListener("fullscreenchange", () => {
-  // Intentionally left as a no-op. Fullscreen is a presentation nicety here,
-  // not something the scoreboard's lifecycle depends on.
+  if (!document.fullscreenElement && scoreboardRoot.innerHTML) scoreboardRoot.innerHTML = "";
 });
 
 // ================= REGISTRATIONS =================
